@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leak Search</title>
+<style>
+body { font-family: sans-serif; background:#111; color:#eee; margin:2em; }
+input, select, button { padding:0.5em; margin:0.2em; background:#222; color:#eee; border:1px solid #444; }
+#results { margin-top:1em; }
+.result { border:1px solid #333; padding:0.5em; margin:0.5em 0; background:#1a1a1a; }
+</style>
+</head>
+<body>
+<h1>Recherche dans les fuites</h1>
+<input type="text" id="searchBox" placeholder="IBAN, email, téléphone...">
+<select id="typeFilter">
+<option value="">Tous types</option>
+<option value="iban">IBAN</option>
+<option value="email">Email</option>
+<option value="phone">Téléphone</option>
+<option value="bic">BIC</option>
+<option value="name">Nom</option>
+<option value="address">Adresse</option>
+</select>
+<button onclick="doSearch()">Chercher</button>
+<div id="results"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lunr.js/2.3.9/lunr.min.js"></script>
+<script>
+let idx;
+let documents = [];
+
+fetch('index.json')
+.then(res => res.json())
+.then(data => {
+    documents = data;
+    idx = lunr(function() {
+        this.ref('id');
+        this.field('value');
+        this.field('type');
+        this.field('source');
+        documents.forEach((doc, i) => {
+            doc.id = i;
+            this.add(doc);
+        });
+    });
+    document.getElementById('searchBox').disabled = false;
+    document.getElementById('searchBox').placeholder = 'Rechercher...';
+});
+
+function doSearch() {
+    const q = document.getElementById('searchBox').value.trim();
+    const typeFilter = document.getElementById('typeFilter').value;
+    if (!q) return;
+    if (!idx) { alert('Index en cours de chargement'); return; }
+
+    let query = q;
+    if (typeFilter) {
+        query += ' +type:' + typeFilter;
+    }
+
+    const results = idx.search(query);
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = '';
+    results.forEach(r => {
+        const doc = documents[r.ref];
+        const div = document.createElement('div');
+        div.className = 'result';
+        div.innerHTML = `<strong>${doc.type}</strong> : ${doc.value}<br><small>Source: ${doc.source}</small><pre>${doc.full_data}</pre>`;
+        resultsDiv.appendChild(div);
+    });
+    if (results.length === 0) {
+        resultsDiv.innerHTML = '<p>Aucun résultat.</p>';
+    }
+}
+</script>
+</body>
+</html>
